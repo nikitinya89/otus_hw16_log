@@ -79,4 +79,29 @@ $template RemoteLogs,"/var/log/rsyslog/%HOSTNAME%/%PROGRAMNAME%.log"
 
 ![Auditd](auditd.jpg)
 
-### Hазвернуть ELK
+### Развернуть ELK
+На **elk** устанавливаем Elasticsearch, Logstash и Kibana из репозитория Яндекс. На **web** ставим Filebeat. Будем отправлять логи nginx на Logstash на сервере **elk**:
+##### /etc/filebeat/filebeat.yml
+```bash
+filebeat.inputs:
+- type: log
+  paths:
+    - /var/log/nginx/*.log
+  enabled: true
+  exclude_files: ['.gz$']
+  prospector.scanner.exclude_files: ['.gz$']
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: true
+output.logstash:
+  hosts: ["192.168.56.20:5044"]
+```
+Зайдем в Kibana по порту 5601. Мы увидим, что Logstash успешно получил логи Nginx от Filebeat и отправил их в Elasticsearch:  
+  
+![index](kibana1.jpg)
+![weblogs](kibana2.jpg)
+
+На основании полученных логов можем построить простенький Dashboard:
+
+![dashboard](kibana3.jpg)
+
