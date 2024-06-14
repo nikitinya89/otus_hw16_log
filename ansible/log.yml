@@ -1,0 +1,6 @@
+- name: configure logging
+  hosts: srv
+  become: true
+  gather_facts: no
+  roles:
+    - otus_log

@@ -1,0 +1,240 @@
+---
+# tasks file for otus_log
+
+- name: set time
+  shell: timedatectl set-ntp true; \
+         cp /usr/share/zoneinfo/Europe/Moscow /etc/localtime
+
+- name: install nginx
+  apt:
+    name: nginx
+    state: present
+    update_cache: true
+  tags: nginx_install
+  when: "'web' in group_names"
+
+- name: nginx config
+  copy:
+    src: nginx.conf
+    dest: /etc/nginx/nginx.conf
+    owner: root
+    group: root
+    mode: '0644'
+  tags: nginx_config
+  when: "'web' in group_names"
+
+- name: restart nginx
+  ansible.builtin.systemd:
+    state: restarted
+    name: nginx
+  when: "'web' in group_names"
+
+
+- name: rsyslog client config
+  copy:
+    src: all.conf
+    dest: /etc/rsyslog.d/
+    owner: root
+    group: root
+    mode: '0644'
+  tags: rsyslog_clint_config
+  when: "'web' in group_names"
+
+
+- name: rsyslog server config
+  copy:
+    src: rsyslog.conf
+    dest: /etc/rsyslog.conf
+    owner: root
+    group: root
+    mode: '0644'
+  tags: rsyslog_srv_config
+  when: "'log' in group_names"
+
+- name: restart rsyslog
+  ansible.builtin.systemd:
+    state: restarted
+    name: rsyslog
+  when: "'web' in group_names or 'log' in group_names"
+
+- name: install auditd
+  apt:
+    name:
+      - auditd
+      - audispd-plugins
+    state: present
+  when: "'web' in group_names"
+
+- name: auditd config
+  copy:
+    src: nginx.rules
+    dest: /etc/audit/rules.d/
+    owner: root
+    group: root
+    mode: '0640'
+  tags: audit_config
+  when: "'web' in group_names"
+
+- name: restart auditd
+  ansible.builtin.systemd:
+    state: restarted
+    name: auditd
+  when: "'web' in group_names"
+
+- name: add yandex repo
+  shell: echo "deb [trusted=yes] https://mirror.yandex.ru/mirrors/elastic/8/ stable main" \
+         | tee /etc/apt/sources.list.d/elastic-8.x.list
+  tags: yandex_repo
+  when: "'web' in group_names or 'elk' in group_names"
+
+- name: install java
+  apt:
+    name: default-jdk
+    state: present
+    update_cache: true
+  tags: java_install
+  when: "'elk' in group_names"
+
+- name: install elasticsearch
+  apt:
+    name: elasticsearch
+    state: present
+    update_cache: true
+  tags: elk_install
+  when: "'elk' in group_names"
+
+- name: install kibana
+  apt:
+    name: kibana
+    state: present
+    update_cache: true
+  tags: elk_install
+  when: "'elk' in group_names"
+
+- name: install logstash
+  apt:
+    name: logstash
+    state: present
+    update_cache: true
+  tags: elk_install
+  when: "'elk' in group_names"
+
+- name: install filebeat
+  apt:
+    name: filebeat
+    state: present
+    update_cache: true
+  tags: elk_install
+  when: "'web' in group_names"
+
+- name: systemd daemon reload
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: "'web' in group_names or 'elk' in group_names"
+
+- name: elasticsearch config
+  copy:
+    src: elasticsearch.yml
+    dest: /etc/elasticsearch/
+    owner: root
+    group: elasticsearch
+    mode: '0660'
+  tags: elasticsearch_config
+  when: "'elk' in group_names"
+
+
+- name: start elasticsearch
+  ansible.builtin.systemd:
+    name: elasticsearch
+    state: restarted
+    enabled: true
+  tags: start_elasticsearch
+  when: "'elk' in group_names"
+
+- name: kibana config
+  copy:
+    src: kibana.yml
+    dest: /etc/kibana/
+    owner: root
+    group: kibana
+    mode: '0660'
+  tags: kibana_config
+  when: "'elk' in group_names"
+
+- name: start kibana
+  ansible.builtin.systemd:
+    name: kibana
+    state: restarted
+    enabled: true
+  tags: start_kibana
+  when: "'elk' in group_names"
+
+- name: logstash config
+  copy:
+    src: logstash.yml
+    dest: /etc/logstash/
+    owner: root
+    group: root
+    mode: '0644'
+  tags: logstash_config
+  when: "'elk' in group_names"
+
+- name: logstash config input
+  copy:
+    src: input.conf
+    dest: /etc/logstash/conf.d/
+    owner: root
+    group: root
+    mode: '0644'
+  tags: logstash_config
+  when: "'elk' in group_names"
+
+- name: logstash config filter
+  copy:
+    src: filter.conf
+    dest: /etc/logstash/conf.d/
+    owner: root
+    group: root
+    mode: '0644'
+  tags: logstash_config
+  when: "'elk' in group_names"
+
+- name: logstash config output
+  copy:
+    src: output.conf
+    dest: /etc/logstash/conf.d/
+    owner: root
+    group: root
+    mode: '0644'
+  tags: logstash_config
+  when: "'elk' in group_names"
+
+- name: start logstash
+  ansible.builtin.systemd:
+    name: logstash
+    state: restarted
+    enabled: true
+  tags: start_logstash
+  when: "'elk' in group_names"
+
+- name: filebeat config
+  copy:
+    src: filebeat.yml
+    dest: /etc/filebeat/
+    owner: root
+    group: root
+    mode: '0600'
+  tags: filebeat_config
+  when: "'web' in group_names"
+
+- name: filebeat module
+  shell: filebeat modules enable nginx
+  when: "'web' in group_names"
+
+- name: start filebeat
+  ansible.builtin.systemd:
+    name: filebeat
+    state: restarted
+    enabled: true
+  tags: start_filebeat
+  when: "'web' in group_names"
