@@ -37,6 +37,46 @@ ansible-playbook log.yml
 
 ### Настраиваем центральный лог сервер
 
+На **log** настраиваем rsyslog сервер, чтобы он слушал на 514 порту и принимал логи в папку */var/log/rsyslog*:
+##### /etc/rsyslog.conf
+```bash
+# provides UDP syslog reception
+module(load="imudp")
+input(type="imudp" port="514")
+
+# provides TCP syslog reception
+module(load="imtcp")
+input(type="imtcp" port="514")
+...
+#Add remote logs
+$template RemoteLogs,"/var/log/rsyslog/%HOSTNAME%/%PROGRAMNAME%.log"
+*.* ?RemoteLogs
+& ~
+```
+На **web** устанавливаем *nginx* и указываем в конфигурационном файле отправку логов на rsyslog сервер:
+##### /etc/nginx/nginx.conf
+```bash
+ error_log  syslog:server=192.168.56.15:514,tag=nginx_error;
+ access_log syslog:server=192.168.56.15:514,tag=nginx_access,severity=info combined;
+```
+Также в *rsyslog* клиенте настраиваем отправку всех логов на сервер:
+##### /etc/rsyslog.d/all.conf
+```bash
+*.* @@192.168.56.15:514
+```
+В результате на сервере **log** в каталоге /var/log/rsyslog/web появятся логи с сервера **web**:  
+  
+![Rsyslog](rsyslog.jpg)
 ### Настраиваем аудит, следящий за изменением конфигов Nginx
+На **web** устанаваливаем утилиты *auditd* и *audispd-plugins*
+Настраиваем audit на отслеживание изменений файлов в /etc/nginx:
+##### /etc/audit/rules.d/nginx.rules
+```bash
+-w /etc/nginx/ -p w -k nginx
+```
+
+Теперь все изменения конфигурационных файлов Nginx будут отслеживаться с помощью auditd:  
+
+![Auditd](auditd.jpg)
 
 ### Hазвернуть ELK
